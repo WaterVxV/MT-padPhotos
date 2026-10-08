@@ -1,0 +1,18 @@
+*.iml
+.gradle/
+.kotlin/
+local.properties
+.idea/
+.DS_Store
+build/
+app/build/
+/captures
+.externalNativeBuild
+.cxx
+
+# 签名与凭据（切勿提交）
+*.jks
+*.keystore
+keystore/
+# 含密码的本地配置：仓库只保留含占位符的模板
+gradle.properties.bak

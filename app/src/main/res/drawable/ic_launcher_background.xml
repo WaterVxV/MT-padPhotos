@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 自适应图标背景：与应用图标源图渐变一致（顶部浅米 -> 底部橙） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:angle="270"
+        android:startColor="#FBECD4"
+        android:endColor="#FCB174" />
+</shape>
