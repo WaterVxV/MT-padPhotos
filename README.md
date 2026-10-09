@@ -1,8 +1,8 @@
 # MT padPhotos（MT轮播相册）
 
-把一台闲置的安卓平板改造成**常驻的物理电子相册**：设备长期放在家里滚动展示 NAS 相册库中的照片和视频，支持开机自启、自动轮播、后台同步与离线观看。
+把一台闲置的安卓平板改造成专为MT Photos的**常驻的物理电子相册**：设备长期放在家里滚动展示 NAS 相册库中的照片和视频，支持开机自启、自动轮播、后台同步与离线观看。
 
-> **本项目是 MT Photo（NAS 相册软件）的专用客户端，不是通用相册应用。** 认证体系（API Key → auth_code）、数据接口（`/api-album/filesV2`、`/gateway/*`、`/file-delete-log`）与媒体画质规格（s260/proxy 等）均直接建立在 MT Photo OpenAPI 之上，离开 MT Photo 无法工作。
+> **本项目是 [MT Photo](https://mtmt.tech)（NAS 相册软件）的专用客户端，不是通用相册应用。** 认证体系（API Key → auth_code）、数据接口（`/api-album/filesV2`、`/gateway/*`、`/file-delete-log`）与媒体画质规格（s260/proxy 等）均直接建立在 MT Photo OpenAPI 之上，离开 MT Photo 无法工作。
 >
 > 📘 **使用手册（含真机截图）**：[docs/使用说明书.md](docs/使用说明书.md)
 
@@ -25,7 +25,7 @@
 | 目标设备 | 安卓平板（参考设备：Helio G99 / 4GB RAM / 10.61" 2000×1200 横屏） |
 | 系统 | Android 12+（真机验证于 Android 14） |
 | 网络 | 与 NAS 同局域网 |
-| 服务端 | **MT Photo**（需开启 API，使用管理员 API Key 登录） |
+| 服务端 | **[MT Photo](https://mtmt.tech)**（需开启 API，使用管理员 API Key 登录） |
 
 ## 技术栈
 
