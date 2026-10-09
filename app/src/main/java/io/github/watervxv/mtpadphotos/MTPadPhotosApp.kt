@@ -63,12 +63,20 @@ class MTPadPhotosApp : Application() {
  */
 private class StripAuthCodeKeyer : Keyer<String> {
     override fun key(data: String, options: Options): String? {
-        val q = data.indexOf('?')
-        if (q < 0) return null
-        val kept = data.substring(q + 1)
+        // 非标准 http(s) URL 交回默认 keyer
+        val schemeEnd = data.indexOf("://")
+        if (schemeEnd < 0) return null
+        val pathStart = data.indexOf('/', schemeEnd + 3)
+        if (pathStart < 0) return null
+        val pathAndQuery = data.substring(pathStart)
+        val qs = pathAndQuery.indexOf('?')
+        if (qs < 0) return pathAndQuery
+        // 剥离 auth_code（24h 轮换），并去掉 scheme://host 前缀：
+        // 服务器换地址/换端口后缓存 key 不变，离线缓存与封面缓存全部继续有效
+        val kept = pathAndQuery.substring(qs + 1)
             .split('&')
             .filterNot { it.startsWith("auth_code=") }
-        val base = data.substring(0, q)
-        return if (kept.isEmpty()) base else "$base?${kept.joinToString("&")}"
+        return if (kept.isEmpty()) pathAndQuery.substring(0, qs)
+        else "${pathAndQuery.substring(0, qs)}?${kept.joinToString("&")}"
     }
 }

@@ -13,6 +13,7 @@ import io.github.watervxv.mtpadphotos.data.remote.AuthManager
 import io.github.watervxv.mtpadphotos.data.remote.MtPhotoApi
 import io.github.watervxv.mtpadphotos.data.repo.AlbumRepository
 import io.github.watervxv.mtpadphotos.data.repo.DefaultAlbumRepository
+import io.github.watervxv.mtpadphotos.data.sync.ConnectionMonitor
 import io.github.watervxv.mtpadphotos.data.repo.DefaultSettingsRepository
 import io.github.watervxv.mtpadphotos.data.repo.SearchRepository
 import io.github.watervxv.mtpadphotos.data.repo.SettingsRepository
@@ -79,8 +80,10 @@ class AppContainer(context: Context) {
 
     val mtPhotoApi: MtPhotoApi by lazy { retrofit.create(MtPhotoApi::class.java) }
 
+    val connectionMonitor = ConnectionMonitor()
+
     val authManager: AuthManager by lazy {
-        AuthManager(mtPhotoApi, secureKeyStore, settingsStore)
+        AuthManager(mtPhotoApi, secureKeyStore, settingsStore, connectionMonitor)
     }
 
     val networkMonitor: NetworkMonitor by lazy { NetworkMonitor(context) }
@@ -95,6 +98,7 @@ class AppContainer(context: Context) {
             authManager = authManager,
             mediaFileDao = if (realMode) database.mediaFileDao() else null,
             deleteLogCursorDao = if (realMode) database.deleteLogCursorDao() else null,
+            connectionMonitor = connectionMonitor,
             networkMonitor = networkMonitor
         )
     }

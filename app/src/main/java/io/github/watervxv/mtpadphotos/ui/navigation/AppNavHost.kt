@@ -115,12 +115,11 @@ fun AppNavHost(
                 settingsRepository = settingsRepository,
                 cacheManager = cacheManager,
                 secureKeyStore = secureKeyStore,
+                authManager = authManager,
                 onBack = { navController.popBackStack() },
-                onLogout = {
-                    MainActivity.pinVerifiedThisProcess = false
-                    navController.navigate(Routes.ONBOARDING) {
-                        popUpTo(navController.graph.id) { inclusive = true }
-                    }
+                onServerConfigSaved = {
+                    // 服务器配置变更后立即强制重同步，刷新相册与封面
+                    scope.launch { syncManager.syncAll(force = true) }
                 }
             )
         }

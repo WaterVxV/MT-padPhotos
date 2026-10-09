@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
@@ -246,8 +247,10 @@ private fun SlideshowScreenContent(
         )
     }
 
-    // 断点续播：按媒体文件 ID 记录/恢复播放位置（刷新打乱顺序也能对上）
+    // 断点续播：按媒体文件 ID 记录/恢复播放位置（刷新打乱顺序也能对上）。
+    // 只保留当前播放相册的进度：进入任何相册时清掉其他相册的记录
     LaunchedEffect(controller) {
+        withContext(Dispatchers.IO) { albumRepository.clearOtherPlayPositions(albumId) }
         if (items.isNotEmpty()) {
             val savedFid = withContext(Dispatchers.IO) { albumRepository.getPlayPosition(albumId) }
             if (savedFid != null) {
@@ -450,6 +453,12 @@ private fun SlideshowContent(
                     },
                     onDetails = {
                         showDetails = true
+                        lastInteractionTime = System.currentTimeMillis()
+                    },
+                    onRestart = {
+                        // 从头开始：恢复播放态后跳到第一张（restartTimer 需要 isPlaying=true）
+                        controller.play()
+                        controller.jumpTo(0)
                         lastInteractionTime = System.currentTimeMillis()
                     }
                 )
@@ -833,7 +842,8 @@ private fun SlideshowTopBar(
     iconColor: Color,
     overlayBg: Color,
     onBack: () -> Unit,
-    onDetails: () -> Unit
+    onDetails: () -> Unit,
+    onRestart: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -893,6 +903,21 @@ private fun SlideshowTopBar(
             )
 
             Spacer(modifier = Modifier.weight(1f))
+
+            // 从头开始：跳回第一张重新播放
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clickableNoRipple(onRestart),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Replay,
+                    contentDescription = "从头开始",
+                    tint = iconColor,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
 
             // ⋮ 更多菜单按钮
             Box(

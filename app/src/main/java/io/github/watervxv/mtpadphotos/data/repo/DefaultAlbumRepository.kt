@@ -122,6 +122,10 @@ class DefaultAlbumRepository(
         playPositionDao.save(PlayPositionEntity(albumId = albumId, fileId = fileId))
     }
 
+    override suspend fun clearOtherPlayPositions(albumId: String) {
+        playPositionDao.clearExcept(albumId)
+    }
+
     override suspend fun refreshMediaItems(albumId: String): Result<List<MediaItem>> = runCatching {
         val authCode = authManager.ensureAuthCode().getOrThrow()
         val now = System.currentTimeMillis()

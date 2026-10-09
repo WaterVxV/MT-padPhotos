@@ -99,6 +99,7 @@ fun MainScreen(
     val tutorialShown by settingsRepository.tutorialShown.collectAsState()
     val authCode by authManager.authCode.collectAsState(initial = null)
     val isOnline by networkMonitor.isOnline.collectAsState(initial = networkMonitor.isOnlineNow())
+    val serverUnreachable by syncManager.connectionMonitor.serverUnreachable.collectAsState()
     val isSyncing by syncManager.isSyncing.collectAsState()
     val syncProgress by syncManager.syncProgress.collectAsState()
     val initialSyncCompleted by settingsRepository.initialSyncCompleted.collectAsState()
@@ -191,6 +192,12 @@ fun MainScreen(
                         modifier = Modifier.padding(start = 4.dp)
                     )
                 }
+                if (serverUnreachable) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ServerUnreachableBanner(
+                        onRetry = { scope.launch { syncManager.syncAll(force = true) } }
+                    )
+                }
                 if (romGuide.family != RomFamily.OTHER && !romGuideDismissed) {
                     Spacer(modifier = Modifier.height(8.dp))
                     RomGuideBanner(
@@ -242,6 +249,28 @@ fun MainScreen(
                 onRetry = { scope.launch { syncManager.syncAll(force = true) } },
                 onLogout = onLogout
             )
+        }
+    }
+}
+
+@Composable
+private fun ServerUnreachableBanner(onRetry: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "无法连接服务器，正在显示离线内容",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onRetry) { Text("重试") }
         }
     }
 }

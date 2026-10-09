@@ -28,6 +28,8 @@ interface AlbumRepository {
     suspend fun getPlayPosition(albumId: String): Long?
     /** 断点续播：保存相册当前播放的文件 ID。 */
     suspend fun savePlayPosition(albumId: String, fileId: Long)
+    /** 断点续播：只保留当前播放相册的进度，清除其他相册的记录。 */
+    suspend fun clearOtherPlayPositions(albumId: String)
 }
 
 class FakeAlbumRepository : AlbumRepository {
@@ -43,6 +45,8 @@ class FakeAlbumRepository : AlbumRepository {
     override suspend fun getPlayPosition(albumId: String): Long? = null
 
     override suspend fun savePlayPosition(albumId: String, fileId: Long) {}
+
+    override suspend fun clearOtherPlayPositions(albumId: String) {}
 
     override suspend fun getMediaItems(albumId: String): List<MediaItem> {
         delay(200)

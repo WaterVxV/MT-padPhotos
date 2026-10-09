@@ -9,12 +9,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -39,9 +44,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.watervxv.mtpadphotos.data.local.prefs.SecureKeyStore
 import io.github.watervxv.mtpadphotos.data.media.CacheManager
+import io.github.watervxv.mtpadphotos.data.remote.AuthManager
 import io.github.watervxv.mtpadphotos.data.repo.SettingsRepository
 import io.github.watervxv.mtpadphotos.domain.model.PlayOrder
 import io.github.watervxv.mtpadphotos.domain.model.ThemeMode
@@ -58,8 +65,9 @@ fun SettingsScreen(
     settingsRepository: SettingsRepository,
     cacheManager: CacheManager,
     secureKeyStore: SecureKeyStore,
+    authManager: AuthManager,
     onBack: () -> Unit,
-    onLogout: () -> Unit
+    onServerConfigSaved: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     Scaffold(
@@ -186,55 +194,128 @@ fun SettingsScreen(
                 }
             }
 
-            item { SettingsSectionTitle("账号") }
+            item { SettingsSectionTitle("服务器") }
             item {
-                var showLogoutConfirm by remember { mutableStateOf(false) }
-                TextButton(
-                    onClick = { showLogoutConfirm = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    Text("退出登录", color = MaterialTheme.colorScheme.error)
-                }
-                if (showLogoutConfirm) {
-                    LogoutConfirmDialog(
-                        onConfirm = {
-                            showLogoutConfirm = false
-                            secureKeyStore.clearAll()
-                            settingsRepository.setPinEnabled(false)
-                            settingsRepository.clearAuthCode()
-                            settingsRepository.resetOnboarding()
-                            onLogout()
-                        },
-                        onDismiss = { showLogoutConfirm = false }
-                    )
-                }
+                ServerConnectionSection(
+                    authManager = authManager,
+                    secureKeyStore = secureKeyStore,
+                    onSaved = onServerConfigSaved
+                )
             }
         }
     }
 }
 
 @Composable
-private fun LogoutConfirmDialog(
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+private fun ServerConnectionSection(
+    authManager: AuthManager,
+    secureKeyStore: SecureKeyStore,
+    onSaved: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("退出登录") },
-        text = {
-            Text("确定要退出登录吗？退出后需要重新输入 NAS 地址和 API Key。")
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("确定退出", color = MaterialTheme.colorScheme.error)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+    // 预填当前已保存的配置；API Key 不落日志
+    var serverUrl by remember { mutableStateOf(secureKeyStore.getServerUrl() ?: "") }
+    var apiKey by remember { mutableStateOf(secureKeyStore.getApiKey() ?: "") }
+    var keyVisible by remember { mutableStateOf(false) }
+    var isVerifying by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var isError by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    Column {
+        OutlinedTextField(
+            value = serverUrl,
+            onValueChange = { serverUrl = it; isError = false },
+            label = { Text("NAS 地址") },
+            singleLine = true,
+            enabled = !isVerifying,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = apiKey,
+            onValueChange = { apiKey = it; isError = false },
+            label = { Text("API Key") },
+            singleLine = true,
+            enabled = !isVerifying,
+            visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { keyVisible = !keyVisible }) {
+                    Icon(
+                        imageVector = if (keyVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                        contentDescription = if (keyVisible) "隐藏 API Key" else "显示 API Key"
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        message?.let { msg ->
+            Text(
+                text = msg,
+                color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodySmall
+            )
+            Spacer(modifier = Modifier.height(4.dp))
         }
-    )
+        Button(
+            enabled = !isVerifying,
+            onClick = {
+                if (isVerifying) return@Button
+                val normalizedUrl = serverUrl.trim().trimEnd('/')
+                    .let { if (it.startsWith("http://") || it.startsWith("https://")) it else "http://$it" }
+                val trimmedKey = apiKey.trim()
+                when {
+                    normalizedUrl.length < 12 -> {
+                        isError = true
+                        message = "NAS 地址格式不正确"
+                    }
+                    trimmedKey.isBlank() -> {
+                        isError = true
+                        message = "请输入 API Key"
+                    }
+                    else -> {
+                        // 记住旧配置，验证失败时回滚，避免把可用配置改坏
+                        val oldUrl = secureKeyStore.getServerUrl()
+                        val oldKey = secureKeyStore.getApiKey()
+                        isVerifying = true
+                        message = null
+                        scope.launch {
+                            authManager.saveCredentials(normalizedUrl, trimmedKey)
+                            authManager.refreshAuthCode().fold(
+                                onSuccess = {
+                                    isVerifying = false
+                                    isError = false
+                                    message = "已保存，服务器连接成功"
+                                    onSaved()
+                                },
+                                onFailure = { e ->
+                                    // 回滚到旧配置，保证原连接不被改坏
+                                    if (oldUrl != null && oldKey != null) {
+                                        authManager.saveCredentials(oldUrl, oldKey)
+                                    }
+                                    isVerifying = false
+                                    isError = true
+                                    message = when (e) {
+                                        is java.net.UnknownHostException -> "无法解析地址，请检查 NAS 地址（配置未保存）"
+                                        is java.net.ConnectException -> "无法连接 NAS，请检查地址与网络（配置未保存）"
+                                        is java.net.SocketTimeoutException -> "连接超时，请检查 NAS 地址与网络（配置未保存）"
+                                        else -> e.message?.takeIf { it.isNotBlank() } ?: "验证失败，配置未保存"
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (isVerifying) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(if (isVerifying) "正在验证…" else "保存并验证")
+        }
+    }
 }
 
 @Composable

@@ -2,6 +2,7 @@ package io.github.watervxv.mtpadphotos.data.remote
 
 import io.github.watervxv.mtpadphotos.data.local.prefs.SecureKeyStore
 import io.github.watervxv.mtpadphotos.data.local.prefs.SettingsStore
+import io.github.watervxv.mtpadphotos.data.sync.ConnectionMonitor
 import io.github.watervxv.mtpadphotos.data.remote.dto.AuthCodeRequest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -10,7 +11,8 @@ import java.net.URLEncoder
 class AuthManager(
     private val api: MtPhotoApi,
     private val secureKeyStore: SecureKeyStore,
-    private val settingsStore: SettingsStore
+    private val settingsStore: SettingsStore,
+    private val connectionMonitor: ConnectionMonitor
 ) {
     companion object {
         private const val AUTH_CODE_TTL_MS = 24 * 60 * 60 * 1000L
@@ -53,8 +55,12 @@ class AuthManager(
                 if (!code.isNullOrBlank()) {
                     val expiresAt = System.currentTimeMillis() + AUTH_CODE_TTL_MS
                     settingsStore.saveAuthCode(code, expiresAt)
+                    // 能换到码 = 服务器可达
+                    connectionMonitor.onConnected()
                     Result.success(code)
                 } else {
+                    // 服务器有响应 = 可达（错误原因由调用方展示）
+                    connectionMonitor.onConnected()
                     // MT Photo 对无效 Key 也返回 201，真实原因在响应的 msg 字段
                     val serverMsg = response.body()?.msg
                     Result.failure(
@@ -65,9 +71,13 @@ class AuthManager(
                     )
                 }
             } else {
+                // 服务器有 HTTP 响应 = 可达
+                connectionMonitor.onConnected()
                 Result.failure(ApiException(response.code(), "获取 auth_code 失败: ${response.errorBody()?.string()}"))
             }
         } catch (e: Exception) {
+            // 连接类失败（Connect/UnknownHost/Timeout 都是 IOException）= 服务器不可达
+            if (e is java.io.IOException) connectionMonitor.onUnreachable()
             Result.failure(e)
         }
     }

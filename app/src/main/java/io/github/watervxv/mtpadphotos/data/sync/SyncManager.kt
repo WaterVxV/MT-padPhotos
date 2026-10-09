@@ -30,6 +30,7 @@ class SyncManager(
     private val authManager: AuthManager,
     private val mediaFileDao: MediaFileDao?,
     private val deleteLogCursorDao: DeleteLogCursorDao?,
+    val connectionMonitor: ConnectionMonitor,
     private val networkMonitor: NetworkMonitor
 ) {
     private val _isSyncing = MutableStateFlow(false)
@@ -66,6 +67,7 @@ class SyncManager(
         if (!networkMonitor.isOnlineNow()) {
             val error = "无网络连接"
             _syncProgress.value = SyncProgress(error = error)
+            connectionMonitor.onUnreachable()
             return Result.failure(IllegalStateException(error))
         }
         // 防止并发同步（例如下拉刷新时后台同步正在进行）
@@ -99,8 +101,10 @@ class SyncManager(
 
             _syncProgress.value = SyncProgress(isSyncing = false, total = 0, processed = 0)
             lastSyncSuccessAt = System.currentTimeMillis()
+            connectionMonitor.onConnected()
             Result.success(Unit)
         } catch (e: Exception) {
+            if (e is java.io.IOException) connectionMonitor.onUnreachable()
             _lastError.value = e.message
             _syncProgress.value = _syncProgress.value.copy(isSyncing = false, error = e.message)
             Result.failure(e)

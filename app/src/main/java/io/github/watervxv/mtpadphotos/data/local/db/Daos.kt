@@ -72,6 +72,9 @@ interface PlayPositionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun save(position: PlayPositionEntity)
+
+    @Query("DELETE FROM play_positions WHERE album_id != :albumId")
+    suspend fun clearExcept(albumId: String)
 }
 
 @Dao
